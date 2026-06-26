@@ -8,10 +8,10 @@ from picographics import PicoGraphics, DISPLAY_PICO_DISPLAY, PEN_P4
 OTA_EVERY = 300   # re-check for new code every 5 minutes
 
 # 240x135 IPS LCD on the Display Pack. PEN_P4 is a 16-colour palette - plenty
-# for text and easy on memory. This firmware reports the panel in portrait
-# (135x240); the driver here ignores rotate=90/270, so we just centre and
-# auto-size text to whatever bounds get_bounds() reports.
-display = PicoGraphics(display=DISPLAY_PICO_DISPLAY, pen_type=PEN_P4)
+# for text and easy on memory. The driver defaults to ROTATE_270 (portrait
+# 135x240), so we pass rotate=0 for the landscape 240x135 layout; use 180 to
+# flip it the other way up. Text is centred and auto-sized to the bounds.
+display = PicoGraphics(display=DISPLAY_PICO_DISPLAY, pen_type=PEN_P4, rotate=0)
 display.set_backlight(0.8)
 
 WIDTH, HEIGHT = display.get_bounds()
