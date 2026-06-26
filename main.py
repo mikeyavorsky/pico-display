@@ -76,6 +76,10 @@ def _left(text, scale, y):
     display.text(text, MARGIN, y, scale=scale)
 
 
+def _right(text, scale, y):
+    display.text(text, WIDTH - MARGIN - display.measure_text(text, scale=scale), y, scale=scale)
+
+
 def _minutes_until(iso, offset):
     # Floor minutes from now until an ISO departure like "2026-06-25T22:39:57
     # -04:00". Needs a synced clock; RTC is UTC, so subtract the API's offset.
@@ -114,13 +118,12 @@ def draw_board(t1, t2, fetched, version):
     display.clear()
 
     sub_h = 8 * SUB_SCALE
-    ver_y = HEIGHT - MARGIN - sub_h          # version line (bottom)
-    fetch_y = ver_y - sub_h                   # last-fetched line (above version)
+    foot_y = HEIGHT - MARGIN - sub_h          # single footer line at the bottom
 
-    # Two rows of departures share the area above the footer lines. Size from
-    # the worst-case template so the digits keep one stable size; reserve SIDE
-    # on each edge so the centred numbers clear the left RL/CR tag.
-    line_h = (fetch_y - 2 - MARGIN) // 2
+    # Two rows of departures share the area above the footer. Size from the
+    # worst-case template so the digits keep one stable size; reserve SIDE on
+    # each edge so the centred numbers clear the left RL/CR tag.
+    line_h = (foot_y - 2 - MARGIN) // 2
     scale = _fit_scale(TEMPLATE, WIDTH - 2 * SIDE, line_h)
 
     tag_h = 8 * SUB_SCALE
@@ -132,9 +135,10 @@ def draw_board(t1, t2, fetched, version):
     _centre(t2, scale, top2 + (line_h - 8 * scale) // 2)
     _left("CR", SUB_SCALE, top2 + (line_h - tag_h) // 2)
 
+    # Footer on one line: fetched time left, truncated version right.
     display.set_pen(WHITE)
-    _centre(fetched, SUB_SCALE, fetch_y)
-    _centre("v" + version, SUB_SCALE, ver_y)
+    _left(fetched, SUB_SCALE, foot_y)
+    _right("V" + version[-7:], SUB_SCALE, foot_y)
     display.update()
 
 
