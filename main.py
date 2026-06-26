@@ -18,27 +18,38 @@ WIDTH, HEIGHT = display.get_bounds()
 BLACK = display.create_pen(0, 0, 0)
 WHITE = display.create_pen(255, 255, 255)
 
-MARGIN = 8   # px to keep clear around the text
+MARGIN = 8     # px to keep clear around the text
+SUB_SCALE = 1  # small footer text (8px tall)
 
 
-def _fit_scale(text, max_scale=8):
-    # Largest integer scale where the text fits within the screen margins.
+def _fit_scale(text, avail_w, avail_h, max_scale=8):
+    # Largest integer scale where the text fits within the given area.
     for scale in range(max_scale, 0, -1):
-        if (display.measure_text(text, scale=scale) <= WIDTH - 2 * MARGIN
-                and 8 * scale <= HEIGHT - 2 * MARGIN):
+        if (display.measure_text(text, scale=scale) <= avail_w
+                and 8 * scale <= avail_h):
             return scale
     return 1
 
 
-def show(text):
-    scale = _fit_scale(text)
+def _centre(text, scale, y):
+    x = (WIDTH - display.measure_text(text, scale=scale)) // 2
+    display.text(text, x, y, scale=scale)
+
+
+def show(text, sub=None):
     display.set_pen(BLACK)
     display.clear()
     display.set_pen(WHITE)
-    # Centre the text on the screen.
-    x = (WIDTH - display.measure_text(text, scale=scale)) // 2
-    y = (HEIGHT - 8 * scale) // 2
-    display.text(text, x, y, scale=scale)
+
+    # Reserve a strip at the bottom for the small footer line, if any.
+    sub_h = 8 * SUB_SCALE if sub else 0
+    main_h = HEIGHT - 2 * MARGIN - sub_h
+    scale = _fit_scale(text, WIDTH - 2 * MARGIN, main_h)
+
+    # Centre the main text within the area above the footer.
+    _centre(text, scale, MARGIN + (main_h - 8 * scale) // 2)
+    if sub:
+        _centre(sub, SUB_SCALE, HEIGHT - MARGIN - sub_h)
     display.update()
 
 
@@ -48,7 +59,7 @@ def loop():
     # be rolled back on the next boot.
     ota.mark_boot_ok()
 
-    show("hello")
+    show("hello", "v" + (ota._local_version() or "?"))
 
     last_ota = time.time()
     while True:
