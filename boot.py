@@ -6,9 +6,7 @@
 
 import network, time
 import ota
-
-SSID     = "your-ssid"
-PASSWORD = "your-wifi-password"
+from secrets import SSID, PASSWORD   # see secrets.example.py; not committed
 
 
 def connect(timeout=20):
@@ -25,6 +23,11 @@ def connect(timeout=20):
     print("WiFi:", wlan.ifconfig()[0])
     return True
 
+
+# Before anything else, roll back a previous update that booted but never
+# confirmed itself (see ota.mark_boot_ok). Runs offline so a bad update that
+# breaks WiFi can still be undone. Resets if it rolls back.
+ota.confirm_or_rollback()
 
 if connect():
     ota.check_and_update()   # resets if an update is applied; else falls through

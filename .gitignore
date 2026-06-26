@@ -1,0 +1,9 @@
+# WiFi credentials - local to each device, never committed.
+secrets.py
+
+# OTA runtime state written on-device.
+version.txt
+bad_version.txt
+update_pending
+*.new
+*.bak
