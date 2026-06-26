@@ -51,8 +51,8 @@ WHITE  = display.create_pen(255, 255, 255)
 RED    = display.create_pen(0xDA, 0x29, 0x1C)   # Red Line
 PURPLE = display.create_pen(0x80, 0x27, 0x6C)   # Commuter Rail
 
-MARGIN = 0     # px to keep clear around the text
-FONT_H = 6     # glyph height of the bitmap6 font (px per scale step)
+MARGIN = 2     # px to keep clear around the text
+FONT_H = 8     # glyph height of the bitmap8 font (px per scale step)
 SUB_SCALE = 2  # small footer text
 DASH = "--"    # placeholder for a missing / over-an-hour departure
 # Widest 3-entry list, used to pick one stable digit size (so the numbers don't
