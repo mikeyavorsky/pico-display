@@ -39,6 +39,28 @@ def _local_version():
         return ""
 
 
+def _parse_version(v):
+    # Split into integer groups so "...-10" sorts after "...-9" (a plain string
+    # compare would put "10" before "9"). E.g. "2026-06-25-10" -> [2026,6,25,10].
+    parts, num = [], ""
+    for ch in v:
+        if ch.isdigit():
+            num += ch
+        elif num:
+            parts.append(int(num)); num = ""
+    if num:
+        parts.append(int(num))
+    return parts
+
+
+def _is_newer(remote, local):
+    # Only move forward. A stale CDN can briefly serve an older version than the
+    # one we already run (e.g. just after an on-demand update); never downgrade.
+    if not local:
+        return True
+    return _parse_version(remote) > _parse_version(local)
+
+
 def _bad_version():
     try:
         with open(BAD_FILE) as f:
@@ -127,8 +149,8 @@ def check_and_update(reset=True, fresh=False):
 
     remote = str(manifest.get("version", ""))
     local = _local_version()
-    if remote == local:
-        print("OTA: up to date (%s)" % remote)
+    if not _is_newer(remote, local):
+        print("OTA: up to date (local %s, remote %s)" % (local, remote))
         return False
     if remote == _bad_version():
         # We already tried this version and it failed to boot. Don't loop on it;
