@@ -132,14 +132,19 @@ def draw_board(t1, t2, fetched, version):
     line_h = (foot_y - 2 - MARGIN) // 2
     scale = _fit_scale(TEMPLATE, WIDTH - 2 * SIDE, line_h)
 
+    # Place the two times as one vertically-centred group; GAP sets the spacing.
     tag_h = FONT_H * SUB_SCALE
-    top1, top2 = MARGIN, MARGIN + line_h
+    text_h = FONT_H * scale
+    GAP = 2
+    block_h = 2 * text_h + GAP
+    y1 = MARGIN + ((foot_y - MARGIN) - block_h) // 2
+    y2 = y1 + text_h + GAP
     display.set_pen(RED)
-    _centre(t1, scale, top1 + (line_h - FONT_H * scale) // 2)
-    _left("RL", SUB_SCALE, top1 + (line_h - tag_h) // 2)
+    _centre(t1, scale, y1)
+    _left("RL", SUB_SCALE, y1 + (text_h - tag_h) // 2)
     display.set_pen(PURPLE)
-    _centre(t2, scale, top2 + (line_h - FONT_H * scale) // 2)
-    _left("CR", SUB_SCALE, top2 + (line_h - tag_h) // 2)
+    _centre(t2, scale, y2)
+    _left("CR", SUB_SCALE, y2 + (text_h - tag_h) // 2)
 
     # Footer on one line: fetched time left, truncated version right.
     display.set_pen(WHITE)
