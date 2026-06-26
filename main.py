@@ -48,7 +48,7 @@ RGBLED(6, 7, 8).set_rgb(0, 0, 0)
 WIDTH, HEIGHT = display.get_bounds()
 BLACK  = display.create_pen(0, 0, 0)
 WHITE  = display.create_pen(255, 255, 255)
-RED    = display.create_pen(0xDA, 0x29, 0x1C)   # Red Line
+RED    = display.create_pen(0xFF, 0x6B, 0x5E)   # Red Line (lightened for contrast)
 PURPLE = display.create_pen(0xC7, 0x92, 0xEA)   # Commuter Rail (lightened for contrast)
 
 MARGIN = 2     # px to keep clear around the text
