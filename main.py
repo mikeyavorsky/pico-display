@@ -72,7 +72,7 @@ def loop():
         a = button_a.value()
         if prev_a == 1 and a == 0:           # 'A' pressed (falling edge)
             show("hello", "checking...")
-            ota.check_and_update()           # resets if it updates
+            ota.check_and_update(fresh=True)  # bypass CDN cache for on-demand checks
             last_ota = time.time()
             home()                           # back to the version footer if no update
         elif time.time() - last_ota > OTA_EVERY:

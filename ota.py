@@ -11,7 +11,7 @@
 # previous version. This closes the remaining failure window: power loss during
 # the rename phase, or code that commits cleanly but can't actually run.
 
-import urequests, uos, gc, json, machine
+import urequests, uos, gc, json, machine, time
 
 # Point these at a GitHub repo (raw URLs) or your own static host.
 MANIFEST_URL = "https://raw.githubusercontent.com/mikeyavorsky/pico-display/main/manifest.json"
@@ -79,11 +79,15 @@ def _download(url, dest):
         gc.collect()
 
 
-def check_and_update(reset=True):
+def check_and_update(reset=True, fresh=False):
     """Return True if an update was applied (device resets before returning
-    when reset=True)."""
+    when reset=True). With fresh=True, append a cache-busting query param to
+    every request so a just-pushed change isn't masked by the raw-host CDN
+    cache (handy for an on-demand check); routine polls leave it off to stay
+    cache-friendly."""
+    bust = "?t=%d" % time.ticks_ms() if fresh else ""
     try:
-        manifest = _fetch_json(MANIFEST_URL)
+        manifest = _fetch_json(MANIFEST_URL + bust)
     except Exception as e:
         print("OTA: manifest fetch failed:", e)
         return False
@@ -105,7 +109,7 @@ def check_and_update(reset=True):
     try:
         # 1) Download everything to staging names. Nothing live is touched yet.
         for name in files:
-            _download(RAW_BASE + name, name + ".new")
+            _download(RAW_BASE + name + bust, name + ".new")
             staged.append(name)
         # 2) All good -> back up the live files, then commit by swapping the
         #    staged copies over them. The .bak copies let a failed boot roll back.

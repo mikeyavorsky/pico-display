@@ -1,4 +1,7 @@
 {
-  "version": "2026-06-25-2",
-  "files": ["main.py", "ota.py"]
+  "version": "2026-06-25-3",
+  "files": [
+    "main.py",
+    "ota.py"
+  ]
 }
