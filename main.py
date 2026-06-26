@@ -71,10 +71,25 @@ def _left(text, scale, y):
     display.text(text, MARGIN, y, scale=scale)
 
 
-def _to_12h(hhmm):
-    # "22:42" -> "10:42", "00:05" -> "12:05", "09:05" -> "9:05".
-    h = int(hhmm[:2]) % 12
-    return "%d:%s" % (h if h else 12, hhmm[3:5])
+NO_TIME = "-- ---"   # shown when there's no departure (or it's over an hour out)
+
+
+def _minutes_until(iso, offset):
+    # Floor minutes from now until an ISO departure like "2026-06-25T22:39:57
+    # -04:00". Needs a synced clock; RTC is UTC, so subtract the API's offset.
+    try:
+        local = (int(iso[0:4]), int(iso[5:7]), int(iso[8:10]),
+                 int(iso[11:13]), int(iso[14:16]), int(iso[17:19]), 0, 0)
+        secs = (time.mktime(local) - offset) - time.time()
+        return 0 if secs < 0 else secs // 60
+    except Exception:
+        return None
+
+
+def _rel(mins):
+    if mins is None or mins > 60:
+        return NO_TIME
+    return "%d min" % mins
 
 
 def _dot(top, line_h, pen):
@@ -137,9 +152,9 @@ def _tz_offset(t):
 
 
 def _next_departure(url):
-    # Return (12h time, tz_offset_seconds, raw_iso) for the soonest prediction,
-    # or (None, None, None). The raw ISO string is kept for ordering the two
-    # times (it sorts correctly even across midnight).
+    # Return (raw_iso, tz_offset_seconds) for the soonest prediction, or
+    # (None, None). The raw ISO drives both the relative time and the ordering
+    # of the two departures (it sorts correctly even across midnight).
     r = urequests.get(url, headers=HEADERS)
     try:
         data = r.json()["data"]
@@ -147,12 +162,12 @@ def _next_departure(url):
         r.close()
         gc.collect()
     if not data:
-        return None, None, None
+        return None, None
     a = data[0]["attributes"]
     t = a.get("departure_time") or a.get("arrival_time")
     if not t:
-        return None, None, None
-    return _to_12h(t[11:16]), _tz_offset(t), t
+        return None, None
+    return t, _tz_offset(t)
 
 
 def _sync_clock():
@@ -168,7 +183,10 @@ def _sync_clock():
 
 def _now_hhmm(offset):
     lt = time.localtime(time.time() + offset)
-    return "%02d:%02d" % (lt[3], lt[4])
+    h, m = lt[3], lt[4]
+    ampm = "AM" if h < 12 else "PM"
+    h12 = h % 12
+    return "%d:%02d %s" % (h12 if h12 else 12, m, ampm)
 
 
 def loop():
@@ -180,7 +198,8 @@ def loop():
 
     banner("loading")
     clock_ok = _sync_clock()
-    t1 = t2 = fetched = "--:--"
+    t1 = t2 = NO_TIME
+    fetched = "--:--"
     raw1 = raw2 = None       # full ISO times, for picking the earlier departure
     earlier = 0
     offset = TZ_DEFAULT
@@ -203,15 +222,15 @@ def loop():
                 if not clock_ok:
                     clock_ok = _sync_clock()
                 try:
-                    r1, o1, raw1 = _next_departure(RED_URL)
-                    r2, o2, raw2 = _next_departure(CR_URL)
-                    if r1:
-                        t1 = r1
-                    if r2:
-                        t2 = r2
+                    raw1, o1 = _next_departure(RED_URL)
+                    raw2, o2 = _next_departure(CR_URL)
                     offset = o1 or o2 or offset
                     if clock_ok:
+                        t1 = _rel(_minutes_until(raw1, o1 or offset)) if raw1 else NO_TIME
+                        t2 = _rel(_minutes_until(raw2, o2 or offset)) if raw2 else NO_TIME
                         fetched = _now_hhmm(offset)
+                    else:
+                        t1 = t2 = NO_TIME
                     # 1 = Red sooner, 2 = CR sooner, 0 = nothing to compare.
                     if raw1 and raw2:
                         earlier = 1 if raw1 <= raw2 else 2
