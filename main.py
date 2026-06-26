@@ -39,7 +39,7 @@ button_a = Pin(12, Pin.IN, Pin.PULL_UP)   # 'A' button on the Display Pack (acti
 # flip it the other way up.
 display = PicoGraphics(display=DISPLAY_PICO_DISPLAY, pen_type=PEN_P4, rotate=0)
 display.set_backlight(0.8)
-display.set_font("bitmap6")   # narrower glyphs than the default bitmap8
+display.set_font("bitmap8")   # default glyphs, not as narrow as bitmap6
 
 WIDTH, HEIGHT = display.get_bounds()
 BLACK  = display.create_pen(0, 0, 0)
@@ -47,7 +47,7 @@ WHITE  = display.create_pen(255, 255, 255)
 RED    = display.create_pen(0xDA, 0x29, 0x1C)   # Red Line
 PURPLE = display.create_pen(0x80, 0x27, 0x6C)   # Commuter Rail
 
-MARGIN = 8     # px to keep clear around the text
+MARGIN = 0     # px to keep clear around the text
 FONT_H = 6     # glyph height of the bitmap6 font (px per scale step)
 SUB_SCALE = 2  # small footer text
 DASH = "--"    # placeholder for a missing / over-an-hour departure
