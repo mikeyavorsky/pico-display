@@ -11,11 +11,20 @@
 # previous version. This closes the remaining failure window: power loss during
 # the rename phase, or code that commits cleanly but can't actually run.
 
-import urequests, uos, gc, json, machine, time
+import urequests, uos, gc, json, machine
 
-# Point these at a GitHub repo (raw URLs) or your own static host.
-MANIFEST_URL = "https://raw.githubusercontent.com/mikeyavorsky/pico-display/main/manifest.json"
-RAW_BASE     = "https://raw.githubusercontent.com/mikeyavorsky/pico-display/main/"
+# Point these at your GitHub repo.
+GITHUB_USER = "mikeyavorsky"
+GITHUB_REPO = "pico-display"
+GITHUB_REF  = "main"            # branch for routine (cache-friendly) polls
+MANIFEST    = "manifest.json"
+
+# Raw files are served via a CDN that caches per ref for a few minutes, so a
+# just-pushed change can lag. A SHA-pinned URL is immutable and never stale, so
+# the on-demand (fresh=True) path resolves the latest commit SHA first.
+RAW_ROOT    = "https://raw.githubusercontent.com/%s/%s/" % (GITHUB_USER, GITHUB_REPO)
+COMMIT_API  = "https://api.github.com/repos/%s/%s/commits/%s" % (GITHUB_USER, GITHUB_REPO, GITHUB_REF)
+
 VERSION_FILE = "version.txt"
 PENDING_FILE = "update_pending"   # marks an update awaiting first-boot confirmation
 BAD_FILE     = "bad_version.txt"  # a version that booted badly and was rolled back
@@ -58,6 +67,22 @@ def _remove(name):
         pass
 
 
+def _latest_sha():
+    # The GitHub API isn't behind the raw CDN, so it reflects pushes right away.
+    # Accept: ...sha returns just the 40-char commit hash; User-Agent is required.
+    r = urequests.get(COMMIT_API, headers={
+        "User-Agent": "pico-ota",
+        "Accept": "application/vnd.github.sha",
+    })
+    try:
+        if r.status_code != 200:
+            raise OSError("HTTP %d for commit SHA" % r.status_code)
+        return r.text.strip()
+    finally:
+        r.close()
+        gc.collect()
+
+
 def _fetch_json(url):
     r = urequests.get(url)
     try:
@@ -81,13 +106,21 @@ def _download(url, dest):
 
 def check_and_update(reset=True, fresh=False):
     """Return True if an update was applied (device resets before returning
-    when reset=True). With fresh=True, append a cache-busting query param to
-    every request so a just-pushed change isn't masked by the raw-host CDN
-    cache (handy for an on-demand check); routine polls leave it off to stay
-    cache-friendly."""
-    bust = "?t=%d" % time.ticks_ms() if fresh else ""
+    when reset=True). With fresh=True, resolve the latest commit SHA and fetch
+    files pinned to it, so a just-pushed change isn't masked by the raw-host CDN
+    cache (handy for an on-demand check); routine polls use the branch ref to
+    stay cache-friendly."""
+    ref = GITHUB_REF
+    if fresh:
+        try:
+            ref = _latest_sha()
+        except Exception as e:
+            print("OTA: SHA lookup failed, falling back to %s:" % GITHUB_REF, e)
+            ref = GITHUB_REF
+    base = RAW_ROOT + ref + "/"
+
     try:
-        manifest = _fetch_json(MANIFEST_URL + bust)
+        manifest = _fetch_json(base + MANIFEST)
     except Exception as e:
         print("OTA: manifest fetch failed:", e)
         return False
@@ -109,7 +142,7 @@ def check_and_update(reset=True, fresh=False):
     try:
         # 1) Download everything to staging names. Nothing live is touched yet.
         for name in files:
-            _download(RAW_BASE + name + bust, name + ".new")
+            _download(base + name, name + ".new")
             staged.append(name)
         # 2) All good -> back up the live files, then commit by swapping the
         #    staged copies over them. The .bak copies let a failed boot roll back.
