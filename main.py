@@ -48,6 +48,9 @@ PURPLE = display.create_pen(0x80, 0x27, 0x6C)   # Commuter Rail
 
 MARGIN = 8     # px to keep clear around the text
 SUB_SCALE = 2  # small footer text (8px tall per scale step)
+DOT_R = 12     # radius of the "earlier departure" dot
+# Keep the centred time clear of the left tag and the right dot.
+SIDE = MARGIN + 2 * DOT_R + 4
 
 
 def _fit_scale(text, avail_w, avail_h, max_scale=8):
@@ -68,6 +71,17 @@ def _left(text, scale, y):
     display.text(text, MARGIN, y, scale=scale)
 
 
+def _to_12h(hhmm):
+    # "22:42" -> "10:42", "00:05" -> "12:05", "09:05" -> "9:05".
+    h = int(hhmm[:2]) % 12
+    return "%d:%s" % (h if h else 12, hhmm[3:5])
+
+
+def _dot(top, line_h, pen):
+    display.set_pen(pen)
+    display.circle(WIDTH - MARGIN - DOT_R, top + line_h // 2, DOT_R)
+
+
 def banner(text):
     # Single centred line - used for startup/recovery messages.
     display.set_pen(BLACK)
@@ -78,7 +92,7 @@ def banner(text):
     display.update()
 
 
-def draw_board(t1, t2, fetched, version):
+def draw_board(t1, t2, fetched, version, earlier=0):
     display.set_pen(BLACK)
     display.clear()
 
@@ -86,10 +100,11 @@ def draw_board(t1, t2, fetched, version):
     ver_y = HEIGHT - MARGIN - sub_h          # version line (bottom)
     fetch_y = ver_y - sub_h                   # last-fetched line (above version)
 
-    # Two big departure times share the area above the footer lines.
+    # Two big departure times share the area above the footer lines. Reserve
+    # SIDE on each edge so the centred time clears the left tag and right dot.
     line_h = (fetch_y - 2 - MARGIN) // 2
-    scale = min(_fit_scale(t1, WIDTH - 2 * MARGIN, line_h),
-                _fit_scale(t2, WIDTH - 2 * MARGIN, line_h))
+    scale = min(_fit_scale(t1, WIDTH - 2 * SIDE, line_h),
+                _fit_scale(t2, WIDTH - 2 * SIDE, line_h))
 
     # Big time centred on each line, with a small same-colour tag pinned left.
     tag_h = 8 * SUB_SCALE
@@ -100,6 +115,12 @@ def draw_board(t1, t2, fetched, version):
     display.set_pen(PURPLE)
     _centre(t2, scale, top2 + (line_h - 8 * scale) // 2)
     _left("CR", SUB_SCALE, top2 + (line_h - tag_h) // 2)
+
+    # Dot on the right of whichever departs first, coloured for that line.
+    if earlier == 1:
+        _dot(top1, line_h, RED)
+    elif earlier == 2:
+        _dot(top2, line_h, PURPLE)
 
     display.set_pen(WHITE)
     _centre(fetched, SUB_SCALE, fetch_y)
@@ -116,7 +137,9 @@ def _tz_offset(t):
 
 
 def _next_departure(url):
-    # Return (HH:MM, tz_offset_seconds) for the soonest prediction, or (None, None).
+    # Return (12h time, tz_offset_seconds, raw_iso) for the soonest prediction,
+    # or (None, None, None). The raw ISO string is kept for ordering the two
+    # times (it sorts correctly even across midnight).
     r = urequests.get(url, headers=HEADERS)
     try:
         data = r.json()["data"]
@@ -124,12 +147,12 @@ def _next_departure(url):
         r.close()
         gc.collect()
     if not data:
-        return None, None
+        return None, None, None
     a = data[0]["attributes"]
     t = a.get("departure_time") or a.get("arrival_time")
     if not t:
-        return None, None
-    return t[11:16], _tz_offset(t)
+        return None, None, None
+    return _to_12h(t[11:16]), _tz_offset(t), t
 
 
 def _sync_clock():
@@ -158,6 +181,8 @@ def loop():
     banner("loading")
     clock_ok = _sync_clock()
     t1 = t2 = fetched = "--:--"
+    raw1 = raw2 = None       # full ISO times, for picking the earlier departure
+    earlier = 0
     offset = TZ_DEFAULT
 
     last_ota = time.time()
@@ -168,18 +193,18 @@ def loop():
         now = time.time()
 
         if prev_a == 1 and a == 0:               # 'A' pressed (falling edge)
-            draw_board(t1, t2, "checking", version)
+            draw_board(t1, t2, "checking", version, earlier)
             ota.check_and_update(fresh=True)      # resets if it updates
             last_ota = now
             version = ota._local_version() or "?"
-            draw_board(t1, t2, fetched, version)
+            draw_board(t1, t2, fetched, version, earlier)
         else:
             if now - last_mbta >= MBTA_EVERY:
                 if not clock_ok:
                     clock_ok = _sync_clock()
                 try:
-                    r1, o1 = _next_departure(RED_URL)
-                    r2, o2 = _next_departure(CR_URL)
+                    r1, o1, raw1 = _next_departure(RED_URL)
+                    r2, o2, raw2 = _next_departure(CR_URL)
                     if r1:
                         t1 = r1
                     if r2:
@@ -187,7 +212,16 @@ def loop():
                     offset = o1 or o2 or offset
                     if clock_ok:
                         fetched = _now_hhmm(offset)
-                    draw_board(t1, t2, fetched, version)
+                    # 1 = Red sooner, 2 = CR sooner, 0 = nothing to compare.
+                    if raw1 and raw2:
+                        earlier = 1 if raw1 <= raw2 else 2
+                    elif raw1:
+                        earlier = 1
+                    elif raw2:
+                        earlier = 2
+                    else:
+                        earlier = 0
+                    draw_board(t1, t2, fetched, version, earlier)
                 except Exception as e:
                     print("MBTA fetch failed:", e)
                 last_mbta = now
