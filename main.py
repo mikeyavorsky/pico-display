@@ -39,6 +39,7 @@ button_a = Pin(12, Pin.IN, Pin.PULL_UP)   # 'A' button on the Display Pack (acti
 # flip it the other way up.
 display = PicoGraphics(display=DISPLAY_PICO_DISPLAY, pen_type=PEN_P4, rotate=0)
 display.set_backlight(0.8)
+display.set_font("bitmap6")   # narrower glyphs than the default bitmap8
 
 WIDTH, HEIGHT = display.get_bounds()
 BLACK  = display.create_pen(0, 0, 0)
@@ -47,7 +48,8 @@ RED    = display.create_pen(0xDA, 0x29, 0x1C)   # Red Line
 PURPLE = display.create_pen(0x80, 0x27, 0x6C)   # Commuter Rail
 
 MARGIN = 8     # px to keep clear around the text
-SUB_SCALE = 2  # small footer text (8px tall per scale step)
+FONT_H = 6     # glyph height of the bitmap6 font (px per scale step)
+SUB_SCALE = 2  # small footer text
 DASH = "--"    # placeholder for a missing / over-an-hour departure
 # Widest 3-entry list, used to pick one stable digit size (so the numbers don't
 # resize as they change). Allows for two-digit minutes plus space separators.
@@ -58,11 +60,11 @@ TAG_W = max(display.measure_text("RL", scale=SUB_SCALE),
 SIDE = MARGIN + TAG_W + 6
 
 
-def _fit_scale(text, avail_w, avail_h, max_scale=8):
+def _fit_scale(text, avail_w, avail_h, max_scale=12):
     # Largest integer scale where the text fits within the given area.
     for scale in range(max_scale, 0, -1):
         if (display.measure_text(text, scale=scale) <= avail_w
-                and 8 * scale <= avail_h):
+                and FONT_H * scale <= avail_h):
             return scale
     return 1
 
@@ -109,7 +111,7 @@ def banner(text):
     display.clear()
     display.set_pen(WHITE)
     scale = _fit_scale(text, WIDTH - 2 * MARGIN, HEIGHT - 2 * MARGIN)
-    _centre(text, scale, (HEIGHT - 8 * scale) // 2)
+    _centre(text, scale, (HEIGHT - FONT_H * scale) // 2)
     display.update()
 
 
@@ -117,7 +119,7 @@ def draw_board(t1, t2, fetched, version):
     display.set_pen(BLACK)
     display.clear()
 
-    sub_h = 8 * SUB_SCALE
+    sub_h = FONT_H * SUB_SCALE
     foot_y = HEIGHT - MARGIN - sub_h          # single footer line at the bottom
 
     # Two rows of departures share the area above the footer. Size from the
@@ -126,19 +128,19 @@ def draw_board(t1, t2, fetched, version):
     line_h = (foot_y - 2 - MARGIN) // 2
     scale = _fit_scale(TEMPLATE, WIDTH - 2 * SIDE, line_h)
 
-    tag_h = 8 * SUB_SCALE
+    tag_h = FONT_H * SUB_SCALE
     top1, top2 = MARGIN, MARGIN + line_h
     display.set_pen(RED)
-    _centre(t1, scale, top1 + (line_h - 8 * scale) // 2)
+    _centre(t1, scale, top1 + (line_h - FONT_H * scale) // 2)
     _left("RL", SUB_SCALE, top1 + (line_h - tag_h) // 2)
     display.set_pen(PURPLE)
-    _centre(t2, scale, top2 + (line_h - 8 * scale) // 2)
+    _centre(t2, scale, top2 + (line_h - FONT_H * scale) // 2)
     _left("CR", SUB_SCALE, top2 + (line_h - tag_h) // 2)
 
     # Footer on one line: fetched time left, truncated version right.
     display.set_pen(WHITE)
     _left(fetched, SUB_SCALE, foot_y)
-    _right("V" + version[-7:], SUB_SCALE, foot_y)
+    _right(version, SUB_SCALE, foot_y)
     display.update()
 
 
