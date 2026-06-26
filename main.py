@@ -1,11 +1,14 @@
 # main.py - writes "hello" on a Pimoroni Pico Display Pack and re-checks for
-# firmware updates periodically. Wrapped so that a crash drops into a recovery
-# loop instead of bricking the device.
+# firmware updates periodically (or on demand via the 'A' button). Wrapped so
+# that a crash drops into a recovery loop instead of bricking the device.
 
 import time
+from machine import Pin
 from picographics import PicoGraphics, DISPLAY_PICO_DISPLAY, PEN_P4
 
 OTA_EVERY = 300   # re-check for new code every 5 minutes
+
+button_a = Pin(12, Pin.IN, Pin.PULL_UP)   # 'A' button on the Display Pack (active-low)
 
 # 240x135 IPS LCD on the Display Pack. PEN_P4 is a 16-colour palette - plenty
 # for text and easy on memory. The driver defaults to ROTATE_270 (portrait
@@ -19,7 +22,7 @@ BLACK = display.create_pen(0, 0, 0)
 WHITE = display.create_pen(255, 255, 255)
 
 MARGIN = 8     # px to keep clear around the text
-SUB_SCALE = 1  # small footer text (8px tall)
+SUB_SCALE = 2  # small footer text (8px tall)
 
 
 def _fit_scale(text, avail_w, avail_h, max_scale=8):
@@ -59,14 +62,24 @@ def loop():
     # be rolled back on the next boot.
     ota.mark_boot_ok()
 
-    show("hello", "v" + (ota._local_version() or "?"))
+    def home():
+        show("hello", "v" + (ota._local_version() or "?"))
 
+    home()
     last_ota = time.time()
+    prev_a = button_a.value()
     while True:
-        if time.time() - last_ota > OTA_EVERY:
-            ota.check_and_update()   # resets if it updates
+        a = button_a.value()
+        if prev_a == 1 and a == 0:           # 'A' pressed (falling edge)
+            show("hello", "checking...")
+            ota.check_and_update()           # resets if it updates
             last_ota = time.time()
-        time.sleep(1)
+            home()                           # back to the version footer if no update
+        elif time.time() - last_ota > OTA_EVERY:
+            ota.check_and_update()           # resets if it updates
+            last_ota = time.time()
+        prev_a = a
+        time.sleep(0.05)
 
 
 try:
