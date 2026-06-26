@@ -8,6 +8,7 @@
 import time, gc
 from machine import Pin
 import urequests
+from pimoroni import RGBLED
 from picographics import PicoGraphics, DISPLAY_PICO_DISPLAY, PEN_P4
 
 OTA_EVERY  = 300   # re-check for new code every 5 minutes
@@ -40,6 +41,9 @@ button_a = Pin(12, Pin.IN, Pin.PULL_UP)   # 'A' button on the Display Pack (acti
 display = PicoGraphics(display=DISPLAY_PICO_DISPLAY, pen_type=PEN_P4, rotate=0)
 display.set_backlight(0.8)
 display.set_font("bitmap8")   # default glyphs, not as narrow as bitmap6
+
+# Turn off the Display Pack's RGB LED (GP6/7/8).
+RGBLED(6, 7, 8).set_rgb(0, 0, 0)
 
 WIDTH, HEIGHT = display.get_bounds()
 BLACK  = display.create_pen(0, 0, 0)
